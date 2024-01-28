@@ -1,5 +1,5 @@
 use std::fmt::Debug;
-use std::ops::Add;
+use std::ops::{Add, Sub};
 
 /// Non resizeable MxN Matrix
 pub struct Matrix<T, const R: usize, const C: usize> {
@@ -114,14 +114,52 @@ where
         Matrix { data }
     }
 }
+impl<T: Default + Clone + Debug, const R: usize, const C: usize> Sub for Matrix<T, R, C>
+where
+    T: Sub<Output = T> + Clone,
+{
+    type Output = Matrix<T, R, C>;
+
+    /// Subtract a matrix by another matrix
+    /// NOTE: the matrix you subtract by MUST have the same dimensionality
+    /// Example:
+    ///  [[1, 2, 3]     [[6, 5, 4],    [[-5, -3, -1]
+    ///   [4, 5, 6]]  -  [3, 2, 1]]  =  [1, 3, 5]]
+    fn sub(self, rhs: Self) -> Matrix<T, R, C> {
+        let data: Vec<T> = (0..R)
+            .flat_map(|row| {
+                let row_a = self.try_get_row(row).expect("Invalid row in self");
+                let row_b = rhs.try_get_row(row).expect("Invalid row in rhs");
+                row_a.into_iter().zip(row_b).map(|(a, b)| a - b)
+            })
+            .collect();
+
+        Matrix { data }
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
+    fn test_matrix_subtraction() {
+        let matrix_a = Matrix::<i32, 2, 3> {
+            data: vec![1, 2, 3, 4, 5, 6],
+        };
+        let matrix_b = Matrix::<i32, 2, 3> {
+            data: vec![6, 5, 4, 3, 2, 1],
+        };
+
+        let expected = Matrix::<i32, 2, 3> {
+            data: vec![-5, -3, -1, 1, 3, 5],
+        };
+        let result = matrix_a - matrix_b;
+        assert_eq!(result.data, expected.data);
+    }
+
+    #[test]
     fn test_matrix_addition() {
-        // Create two 2x2 matrices
         let matrix_a = Matrix::<i32, 2, 2> {
             data: vec![1, 2, 3, 4],
         };
@@ -129,15 +167,11 @@ mod tests {
             data: vec![4, 3, 2, 1],
         };
 
-        // Expected result of addition
         let expected = Matrix::<i32, 2, 2> {
             data: vec![5, 5, 5, 5],
         };
 
-        // Perform addition
-        let result = matrix_a.add(matrix_b);
-
-        // Assert that the result is as expected
+        let result = matrix_a + matrix_b;
         assert_eq!(result.data, expected.data);
     }
 
