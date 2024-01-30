@@ -22,6 +22,13 @@ impl<T: Default + Clone, const R: usize, const C: usize> Matrix<T, R, C> {
         }
     }
 
+    /// Get a vector of the diagonal elements of the matrix
+    pub fn get_diagonal(&self) -> Vec<T> {
+        (0..C)
+            .filter_map(|col_idx| self.get(col_idx, col_idx).cloned())
+            .collect()
+    }
+
     /// Try to get a mutable reference to the value at a given row and column from the matrix
     pub fn get_mut(&mut self, row: usize, col: usize) -> Option<&mut T> {
         if row < R && col < C {
@@ -114,6 +121,21 @@ where
         Matrix { data }
     }
 }
+impl<T, const R: usize, const C: usize> Matrix<T, R, C>
+where
+    T: Default + Clone + Add<Output = T>,
+{
+    /// Perform the trace operation that computes the sum of all diagonal
+    /// elements in the matrix.
+    ///
+    /// NOTE: off-diagnonal elements do NOT contribute to the trace of the
+    /// matrix, so 2 very different matrices can have the same trace.
+    pub fn trace(&self) -> T {
+        self.get_diagonal()
+            .into_iter()
+            .fold(T::default(), |acc, diagonal| acc + diagonal)
+    }
+}
 impl<T: Default + Clone + Debug, const R: usize, const C: usize> Sub for Matrix<T, R, C>
 where
     T: Sub<Output = T> + Clone,
@@ -156,6 +178,28 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_martrix_trace() {
+        let matrix = Matrix::<i32, 2, 2> {
+            data: vec![1, 2, 3, 4],
+        };
+
+        let expected: i32 = 5;
+        let result = matrix.trace();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_martrix_diagonal() {
+        let matrix = Matrix::<i32, 2, 2> {
+            data: vec![1, 2, 3, 4],
+        };
+
+        let expected: Vec<i32> = vec![1, 4];
+        let result = matrix.get_diagonal();
+        assert_eq!(result, expected);
+    }
 
     #[test]
     fn test_matrix_scalar_multiplication() {
