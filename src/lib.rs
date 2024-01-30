@@ -1,5 +1,5 @@
 use std::fmt::Debug;
-use std::ops::{Add, Sub};
+use std::ops::{Add, Mul, Sub};
 
 /// Non resizeable MxN Matrix
 pub struct Matrix<T, const R: usize, const C: usize> {
@@ -137,10 +137,39 @@ where
         Matrix { data }
     }
 }
+impl<T, const R: usize, const C: usize> Matrix<T, R, C>
+where
+    T: Mul<Output = T> + Clone,
+{
+    /// Multiply a matrix by a single number (scalar)
+    /// NOTE: The scalar type MUST match the matrix type.
+    pub fn scalar_multiply(&self, scalar: T) -> Matrix<T, R, C> {
+        let data = self
+            .data
+            .iter()
+            .map(|value| value.clone() * scalar.clone())
+            .collect();
+        Matrix { data }
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_matrix_scalar_multiplication() {
+        let matrix = Matrix::<i32, 2, 2> {
+            data: vec![1, 2, 3, 4],
+        };
+
+        let expected = Matrix::<i32, 2, 2> {
+            data: vec![2, 4, 6, 8],
+        };
+        let result = matrix.scalar_multiply(2);
+
+        assert_eq!(result.data, expected.data);
+    }
 
     #[test]
     fn test_matrix_subtraction() {
