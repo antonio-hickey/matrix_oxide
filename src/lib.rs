@@ -1,22 +1,26 @@
 use std::fmt::Debug;
 use std::ops::{Add, Mul, Sub};
 
-/// Non resizeable MxN Matrix
-pub struct Matrix<T, const R: usize, const C: usize> {
+/// MxN Matrix
+pub struct Matrix<T> {
     pub data: Vec<T>,
+    pub row_size: usize,
+    pub col_size: usize,
 }
-impl<T: Default + Clone, const R: usize, const C: usize> Matrix<T, R, C> {
+impl<T: Default + Clone> Matrix<T> {
     /// Construct a new *non-empty* and *sized* `Matrix`
-    pub fn new() -> Self {
+    pub fn new(row_size: usize, col_size: usize) -> Self {
         Matrix {
-            data: vec![T::default(); R * C],
+            data: vec![T::default(); row_size * col_size],
+            row_size,
+            col_size,
         }
     }
 
     /// Try to get a reference to the value at a given row and column from the matrix
     pub fn get(&self, row: usize, col: usize) -> Option<&T> {
-        if row < R && col < C {
-            Some(&self.data[col + row * C])
+        if row < self.row_size && col < self.col_size {
+            Some(&self.data[col + row * self.col_size])
         } else {
             None
         }
@@ -24,15 +28,15 @@ impl<T: Default + Clone, const R: usize, const C: usize> Matrix<T, R, C> {
 
     /// Get a vector of the diagonal elements of the matrix
     pub fn get_diagonal(&self) -> Vec<T> {
-        (0..C)
+        (0..self.col_size)
             .filter_map(|col_idx| self.get(col_idx, col_idx).cloned())
             .collect()
     }
 
     /// Try to get a mutable reference to the value at a given row and column from the matrix
     pub fn get_mut(&mut self, row: usize, col: usize) -> Option<&mut T> {
-        if row < R && col < C {
-            Some(&mut self.data[col + row * C])
+        if row < self.row_size && col < self.col_size {
+            Some(&mut self.data[col + row * self.col_size])
         } else {
             None
         }
@@ -54,13 +58,13 @@ impl<T: Default + Clone, const R: usize, const C: usize> Matrix<T, R, C> {
     /// this function will return None.
     pub fn try_get_column(&self, column: usize) -> Option<Vec<T>> {
         // Bounds check
-        if column >= C {
+        if column >= self.col_size {
             return None;
         }
 
         // Iterate over all the rows grabbing a specific column each time
-        let col_data: Vec<T> = (0..R)
-            .map(|row| self.data[row * C + column].clone())
+        let col_data: Vec<T> = (0..self.row_size)
+            .map(|row| self.data[row * self.col_size + column].clone())
             .collect();
 
         Some(col_data)
@@ -72,12 +76,14 @@ impl<T: Default + Clone, const R: usize, const C: usize> Matrix<T, R, C> {
     /// this function will return None.
     pub fn try_get_row(&self, row: usize) -> Option<Vec<T>> {
         // Bounds check
-        if row >= R {
+        if row >= self.row_size {
             return None;
         }
 
         // Iterate over all the rows grabbing a specific column each time
-        let row_data: Vec<T> = (0..C).map(|col| self.data[row * C + col].clone()).collect();
+        let row_data: Vec<T> = (0..self.col_size)
+            .map(|col| self.data[row * self.col_size + col].clone())
+            .collect();
 
         Some(row_data)
     }
@@ -87,30 +93,34 @@ impl<T: Default + Clone, const R: usize, const C: usize> Matrix<T, R, C> {
     ///  [[1, 2, 3]       [[1, 4]
     ///   [4, 5, 6]]   ->  [2, 5]
     ///                    [3, 6]]
-    pub fn transpose(&self) -> Matrix<T, R, C> {
+    pub fn transpose(&self) -> Matrix<T> {
         Matrix {
-            data: (0..C)
-                .flat_map(|col| (0..R).map(move |row| self.data[row * C + col].clone()))
+            data: (0..self.col_size)
+                .flat_map(|col| {
+                    (0..self.row_size).map(move |row| self.data[row * self.col_size + col].clone())
+                })
                 .collect(),
+            row_size: self.col_size,
+            col_size: self.row_size,
         }
     }
 }
-impl<T: Default + Clone, const R: usize, const C: usize> Default for Matrix<T, R, C> {
+impl<T: Default + Clone> Default for Matrix<T> {
     /// Create a default `Matrix` instance
     fn default() -> Self {
-        Self::new()
+        Self::new(2, 3)
     }
 }
-impl<T: Default + Clone + Debug, const R: usize, const C: usize> Add for Matrix<T, R, C>
+impl<T: Default + Clone + Debug> Add for Matrix<T>
 where
     T: Add<Output = T> + Clone,
 {
-    type Output = Matrix<T, R, C>;
+    type Output = Matrix<T>;
 
     /// Matrix addition
     /// NOTE: the matrices you add MUST have the same dimensionality
-    fn add(self, rhs: Self) -> Matrix<T, R, C> {
-        let data: Vec<T> = (0..R)
+    fn add(self, rhs: Self) -> Matrix<T> {
+        let data: Vec<T> = (0..self.row_size)
             .flat_map(|row| {
                 let row_a = self.try_get_row(row).expect("Invalid row in self");
                 let row_b = rhs.try_get_row(row).expect("Invalid row in rhs");
@@ -118,10 +128,14 @@ where
             })
             .collect();
 
-        Matrix { data }
+        Matrix {
+            data,
+            col_size: self.col_size,
+            row_size: self.row_size,
+        }
     }
 }
-impl<T, const R: usize, const C: usize> Matrix<T, R, C>
+impl<T> Matrix<T>
 where
     T: Default + Clone + Add<Output = T>,
 {
@@ -136,19 +150,19 @@ where
             .fold(T::default(), |acc, diagonal| acc + diagonal)
     }
 }
-impl<T: Default + Clone + Debug, const R: usize, const C: usize> Sub for Matrix<T, R, C>
+impl<T: Default + Clone + Debug> Sub for Matrix<T>
 where
     T: Sub<Output = T> + Clone,
 {
-    type Output = Matrix<T, R, C>;
+    type Output = Matrix<T>;
 
     /// Subtract a matrix by another matrix
     /// NOTE: the matrix you subtract by MUST have the same dimensionality
     /// Example:
     ///  [[1, 2, 3]     [[6, 5, 4],    [[-5, -3, -1]
     ///   [4, 5, 6]]  -  [3, 2, 1]]  =  [1, 3, 5]]
-    fn sub(self, rhs: Self) -> Matrix<T, R, C> {
-        let data: Vec<T> = (0..R)
+    fn sub(self, rhs: Self) -> Matrix<T> {
+        let data: Vec<T> = (0..self.row_size)
             .flat_map(|row| {
                 let row_a = self.try_get_row(row).expect("Invalid row in self");
                 let row_b = rhs.try_get_row(row).expect("Invalid row in rhs");
@@ -156,22 +170,31 @@ where
             })
             .collect();
 
-        Matrix { data }
+        Matrix {
+            data,
+            row_size: self.row_size,
+            col_size: self.col_size,
+        }
     }
 }
-impl<T, const R: usize, const C: usize> Matrix<T, R, C>
+impl<T> Matrix<T>
 where
     T: Mul<Output = T> + Clone,
 {
     /// Multiply a matrix by a single number (scalar)
     /// NOTE: The scalar type MUST match the matrix type.
-    pub fn scalar_multiply(&self, scalar: T) -> Matrix<T, R, C> {
+    pub fn scalar_multiply(&self, scalar: T) -> Matrix<T> {
         let data = self
             .data
             .iter()
             .map(|value| value.clone() * scalar.clone())
             .collect();
-        Matrix { data }
+
+        Matrix {
+            data,
+            row_size: self.row_size,
+            col_size: self.col_size,
+        }
     }
 }
 
@@ -181,8 +204,10 @@ mod tests {
 
     #[test]
     fn test_martrix_trace() {
-        let matrix = Matrix::<i32, 2, 2> {
+        let matrix = Matrix::<i32> {
             data: vec![1, 2, 3, 4],
+            col_size: 2,
+            row_size: 2,
         };
 
         let expected: i32 = 5;
@@ -192,8 +217,10 @@ mod tests {
 
     #[test]
     fn test_martrix_diagonal() {
-        let matrix = Matrix::<i32, 2, 2> {
+        let matrix = Matrix::<i32> {
             data: vec![1, 2, 3, 4],
+            row_size: 2,
+            col_size: 2,
         };
 
         let expected: Vec<i32> = vec![1, 4];
@@ -203,12 +230,16 @@ mod tests {
 
     #[test]
     fn test_matrix_scalar_multiplication() {
-        let matrix = Matrix::<i32, 2, 2> {
+        let matrix = Matrix::<i32> {
             data: vec![1, 2, 3, 4],
+            row_size: 2,
+            col_size: 2,
         };
 
-        let expected = Matrix::<i32, 2, 2> {
+        let expected = Matrix::<i32> {
             data: vec![2, 4, 6, 8],
+            row_size: 2,
+            col_size: 2,
         };
         let result = matrix.scalar_multiply(2);
 
@@ -217,15 +248,21 @@ mod tests {
 
     #[test]
     fn test_matrix_subtraction() {
-        let matrix_a = Matrix::<i32, 2, 3> {
+        let matrix_a = Matrix::<i32> {
             data: vec![1, 2, 3, 4, 5, 6],
+            row_size: 2,
+            col_size: 3,
         };
-        let matrix_b = Matrix::<i32, 2, 3> {
+        let matrix_b = Matrix::<i32> {
             data: vec![6, 5, 4, 3, 2, 1],
+            row_size: 2,
+            col_size: 3,
         };
 
-        let expected = Matrix::<i32, 2, 3> {
+        let expected = Matrix::<i32> {
             data: vec![-5, -3, -1, 1, 3, 5],
+            row_size: 2,
+            col_size: 3,
         };
         let result = matrix_a - matrix_b;
         assert_eq!(result.data, expected.data);
@@ -233,15 +270,21 @@ mod tests {
 
     #[test]
     fn test_matrix_addition() {
-        let matrix_a = Matrix::<i32, 2, 2> {
+        let matrix_a = Matrix::<i32> {
             data: vec![1, 2, 3, 4],
+            row_size: 2,
+            col_size: 2,
         };
-        let matrix_b = Matrix::<i32, 2, 2> {
+        let matrix_b = Matrix::<i32> {
             data: vec![4, 3, 2, 1],
+            row_size: 2,
+            col_size: 2,
         };
 
-        let expected = Matrix::<i32, 2, 2> {
+        let expected = Matrix::<i32> {
             data: vec![5, 5, 5, 5],
+            row_size: 2,
+            col_size: 2,
         };
 
         let result = matrix_a + matrix_b;
@@ -250,20 +293,20 @@ mod tests {
 
     #[test]
     fn new_matrix_has_correct_size() {
-        let matrix: Matrix<i32, 2, 3> = Matrix::new();
+        let matrix: Matrix<i32> = Matrix::new(2, 3);
         assert_eq!(matrix.data.len(), 6);
     }
 
     #[test]
     fn default_matrix_is_same_as_new() {
-        let default_matrix: Matrix<i32, 2, 3> = Matrix::default();
-        let new_matrix: Matrix<i32, 2, 3> = Matrix::new();
+        let default_matrix: Matrix<i32> = Matrix::default();
+        let new_matrix: Matrix<i32> = Matrix::new(2, 3);
         assert_eq!(default_matrix.data, new_matrix.data);
     }
 
     #[test]
     fn try_get_column_valid() {
-        let matrix: Matrix<i32, 2, 3> = Matrix::new();
+        let matrix: Matrix<i32> = Matrix::new(2, 3);
         let column = matrix.try_get_column(1);
         assert!(column.is_some());
         assert_eq!(column.unwrap(), vec![0, 0]);
@@ -271,14 +314,14 @@ mod tests {
 
     #[test]
     fn try_get_column_invalid() {
-        let matrix: Matrix<i32, 2, 3> = Matrix::new();
+        let matrix: Matrix<i32> = Matrix::new(2, 3);
         let column = matrix.try_get_column(3);
         assert!(column.is_none());
     }
 
     #[test]
     fn try_get_row_valid() {
-        let matrix: Matrix<i32, 2, 3> = Matrix::new();
+        let matrix: Matrix<i32> = Matrix::new(2, 3);
         let row = matrix.try_get_row(0);
         assert!(row.is_some());
         assert_eq!(row.unwrap(), vec![0, 0, 0]);
@@ -286,14 +329,14 @@ mod tests {
 
     #[test]
     fn try_get_row_invalid() {
-        let matrix: Matrix<i32, 2, 3> = Matrix::new();
+        let matrix: Matrix<i32> = Matrix::new(2, 3);
         let row = matrix.try_get_row(2);
         assert!(row.is_none());
     }
 
     #[test]
     fn transpose_works_correctly() {
-        let mut matrix: Matrix<i32, 2, 3> = Matrix::new();
+        let mut matrix: Matrix<i32> = Matrix::new(2, 3);
         for i in 0..matrix.data.len() {
             matrix.data[i] = i as i32;
         }
