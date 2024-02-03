@@ -100,6 +100,7 @@ impl<T: Default + Clone> Matrix<T> {
                     (0..self.row_size).map(move |row| self.data[row * self.col_size + col].clone())
                 })
                 .collect(),
+
             row_size: self.col_size,
             col_size: self.row_size,
         }
@@ -177,9 +178,9 @@ where
         }
     }
 }
-impl<T> Matrix<T>
+impl<T: Default> Matrix<T>
 where
-    T: Mul<Output = T> + Clone,
+    T: Add<Output = T> + Mul<Output = T> + Clone,
 {
     /// Multiply a matrix by a single number (scalar)
     /// NOTE: The scalar type MUST match the matrix type.
@@ -196,11 +197,64 @@ where
             col_size: self.col_size,
         }
     }
+
+    /// Multiply `Matrix` with another `Matrix` using standard matrix multiplication
+    /// NOTE: The matrices inner dimensions MUST match else returns None
+    pub fn multiply(&self, multiplier: &Matrix<T>) -> Option<Matrix<T>> {
+        // Validity check for the matrices inner dimensions
+        if self.col_size != multiplier.row_size {
+            return None;
+        }
+
+        let data: Vec<T> = (0..self.row_size)
+            .flat_map(|i| {
+                (0..multiplier.col_size).map(move |j| {
+                    (0..self.col_size)
+                        .map(|k| {
+                            self.data[i * self.col_size + k].clone()
+                                * multiplier.data[k * multiplier.col_size + j].clone()
+                        })
+                        .fold(T::default(), |acc, x| acc + x)
+                })
+            })
+            .collect();
+
+        Some(Matrix {
+            data,
+            col_size: multiplier.col_size,
+            row_size: self.row_size,
+        })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_matrix_multiplication() {
+        let matrix_a = Matrix::<i32> {
+            data: vec![1, 2, 3, 4],
+            row_size: 2,
+            col_size: 2,
+        };
+
+        let matrix_b = Matrix::<i32> {
+            data: vec![2, 0, 1, 2],
+            row_size: 2,
+            col_size: 2,
+        };
+
+        let expected = Matrix::<i32> {
+            data: vec![4, 4, 10, 8],
+            row_size: 2,
+            col_size: 2,
+        };
+
+        let result = matrix_a.multiply(&matrix_b).unwrap();
+
+        assert_eq!(result.data, expected.data);
+    }
 
     #[test]
     fn test_martrix_trace() {
