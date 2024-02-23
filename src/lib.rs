@@ -225,11 +225,44 @@ where
             row_size: self.row_size,
         })
     }
+
+    /// Multiply the `Matrix` by a vector
+    /// NOTE: The vectors length MUST match the vector columns, else returns None
+    pub fn vector_multiply(&self, multiplier: &[T]) -> Option<Vec<T>> {
+        // Validity check that the `Matrix` column size matches the vector column size
+        if self.col_size != multiplier.len() {
+            return None;
+        }
+
+        let data: Vec<T> = (0..self.row_size)
+            .map(|i| {
+                (0..multiplier.len())
+                    .map(|j| self.data[i * self.col_size + j].clone() * multiplier[j].clone())
+                    .fold(T::default(), |acc, x| acc + x)
+            })
+            .collect();
+
+        Some(data)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_matrix_vector_multiplication() {
+        let matrix = Matrix::<i32> {
+            data: vec![1, 2, 3, 4],
+            row_size: 2,
+            col_size: 2,
+        };
+        let vector = vec![5, 6];
+
+        let expected = vec![17, 39];
+        let result = matrix.vector_multiply(&vector).unwrap();
+        assert_eq!(result, expected);
+    }
 
     #[test]
     fn test_matrix_multiplication() {
@@ -250,9 +283,7 @@ mod tests {
             row_size: 2,
             col_size: 2,
         };
-
         let result = matrix_a.multiply(&matrix_b).unwrap();
-
         assert_eq!(result.data, expected.data);
     }
 
