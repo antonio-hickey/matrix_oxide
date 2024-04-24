@@ -88,6 +88,53 @@ impl<T: Default + Clone> Matrix<T> {
         Some(row_data)
     }
 
+    /// Create a `Matrix` from a columns (vec of vec)
+    pub fn from_columns(cols: Vec<Vec<T>>) -> Matrix<T> {
+        if cols.is_empty() {
+            return Matrix {
+                data: Vec::new(),
+                row_size: 0,
+                col_size: 0,
+            };
+        }
+
+        let row_size = cols[0].len();
+        let col_size = cols.len();
+
+        let data = (0..row_size)
+            .flat_map(|row| cols.iter().filter_map(move |col| col.get(row).cloned()))
+            .collect();
+
+        Matrix {
+            data,
+            row_size,
+            col_size,
+        }
+    }
+
+    /// Create a sub matrix with a specific row and column to exclude
+    pub fn sub_matrix(&self, skip_row: usize, skip_col: usize) -> Matrix<T> {
+        let columns: Vec<Vec<T>> = (0..self.col_size)
+            .filter_map(|col| {
+                if col != skip_col {
+                    Some(
+                        self.try_get_column(col)
+                            // TODO: handle this unwrap, im too tired rn
+                            .unwrap()
+                            .into_iter()
+                            .enumerate()
+                            .filter_map(|(row, val)| if row != skip_row { Some(val) } else { None })
+                            .collect(),
+                    )
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        Matrix::from_columns(columns)
+    }
+
     /// Perform a transpose operation (swap rows for columns and vice versa)
     /// Example:
     ///  [[1, 2, 3]       [[1, 4]
@@ -180,7 +227,7 @@ where
 }
 impl<T: Default> Matrix<T>
 where
-    T: Add<Output = T> + Mul<Output = T> + Clone,
+    T: Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Clone,
 {
     /// Multiply a matrix by a single number (scalar)
     /// NOTE: The scalar type MUST match the matrix type.
@@ -243,6 +290,44 @@ where
             .collect();
 
         Some(data)
+    }
+
+    /// Compute a unique determinant for a `Matrix`
+    /// NOTE: Only computable for square (M x M) matrices.
+    /// NOTE: The determinant is 0 for a `Matrix` with rank r < M (non-invertable).
+    pub fn determinant(&self) -> Option<T> {
+        // Validity check that it's a square matrix
+        if self.col_size != self.row_size {
+            return None;
+        }
+
+        // Base case for recursion: 1x1 matrix
+        if self.row_size == 1 {
+            return Some(self.data[0].clone());
+        }
+
+        if let Some(first_row) = self.try_get_row(0) {
+            let determinant =
+                first_row
+                    .iter()
+                    .enumerate()
+                    .fold(T::default(), |acc, (col_idx, item)| {
+                        let sub_matrix = self.sub_matrix(0, col_idx);
+                        let sub_determinant = sub_matrix.determinant().unwrap();
+
+                        // Alternate between addition and subtraction
+                        // operations every iteration
+                        if col_idx % 2 == 0 {
+                            acc + item.clone() * sub_determinant
+                        } else {
+                            acc - item.clone() * sub_determinant
+                        }
+                    });
+
+            Some(determinant)
+        } else {
+            None
+        }
     }
 }
 
@@ -427,5 +512,46 @@ mod tests {
         }
         let transposed = matrix.transpose();
         assert_eq!(transposed.data, vec![0, 3, 1, 4, 2, 5]);
+    }
+
+    #[test]
+    fn determinant_of_1x1_matrix() {
+        let matrix = Matrix {
+            data: vec![7],
+            row_size: 1,
+            col_size: 1,
+        };
+        assert_eq!(matrix.determinant(), Some(7));
+    }
+
+    #[test]
+    fn determinant_of_2x2_matrix() {
+        let matrix = Matrix {
+            data: vec![1, 2, 3, 4],
+            row_size: 2,
+            col_size: 2,
+        };
+        assert_eq!(matrix.determinant(), Some(-2));
+    }
+
+    #[test]
+    fn determinant_of_3x3_matrix() {
+        let matrix = Matrix {
+            data: vec![3, 2, 1, 0, 1, 4, 5, 6, 0],
+            row_size: 3,
+            col_size: 3,
+        };
+        let expected = -37;
+        assert_eq!(matrix.determinant(), Some(expected));
+    }
+
+    #[test]
+    fn determinant_non_square_matrix() {
+        let matrix = Matrix {
+            data: vec![1, 2, 3, 4, 5, 6],
+            row_size: 2,
+            col_size: 3,
+        };
+        assert_eq!(matrix.determinant(), None);
     }
 }
