@@ -136,10 +136,6 @@ impl<T: Default + Clone> Matrix<T> {
     }
 
     /// Perform a transpose operation (swap rows for columns and vice versa)
-    /// Example:
-    ///  [[1, 2, 3]       [[1, 4]
-    ///   [4, 5, 6]]   ->  [2, 5]
-    ///                    [3, 6]]
     pub fn transpose(&self) -> Matrix<T> {
         Matrix {
             data: (0..self.col_size)
@@ -206,9 +202,6 @@ where
 
     /// Subtract a matrix by another matrix
     /// NOTE: the matrix you subtract by MUST have the same dimensionality
-    /// Example:
-    ///  [[1, 2, 3]     [[6, 5, 4],    [[-5, -3, -1]
-    ///   [4, 5, 6]]  -  [3, 2, 1]]  =  [1, 3, 5]]
     fn sub(self, rhs: Self) -> Matrix<T> {
         let data: Vec<T> = (0..self.row_size)
             .flat_map(|row| {
