@@ -323,6 +323,22 @@ where
         }
     }
 }
+impl<T> Matrix<T> 
+where
+    T: Default + Clone + Mul<Output = T> + Add<Output = T> + Into<f64>,
+{
+    /// Compute the frobenius norm of a `Matrix`
+    pub fn frobenius_norm(&self) -> f64 {
+        let sum_of_squares: f64 = self.data.iter() 
+            .map(|val| {
+                let val_f64: f64 = val.clone().into();
+                val_f64 * val_f64
+            })
+            .fold(f64::default(), |acc, x| acc + x);
+
+        sum_of_squares.sqrt()
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -546,5 +562,32 @@ mod tests {
             col_size: 3,
         };
         assert_eq!(matrix.determinant(), None);
+    }
+
+    
+    #[test]
+    fn test_frobenius_norm_i32() {
+        let matrix = Matrix::<i32> {
+            data: vec![1, 2, 3, 4],
+            row_size: 2,
+            col_size: 2,
+        };
+
+        let expected: f64 = 5.477225575051661; 
+        let result = matrix.frobenius_norm();
+        assert!((result - expected).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_frobenius_norm_f32() {
+        let matrix = Matrix::<f32> {
+            data: vec![1.0, 2.0, 3.0, 4.0],
+            row_size: 2,
+            col_size: 2,
+        };
+
+        let expected: f64 = 5.477225575051661;
+        let result = matrix.frobenius_norm();
+        assert!((result - expected).abs() < 1e-10);
     }
 }
