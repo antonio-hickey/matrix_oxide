@@ -1,3 +1,4 @@
+pub mod activation;
 pub mod matrix;
 
 // expose `Matrix` at the crates root level
