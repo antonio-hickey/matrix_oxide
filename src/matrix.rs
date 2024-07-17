@@ -1,5 +1,5 @@
 use std::fmt::Debug;
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Add, Div, Mul, Sub};
 
 /// MxN Matrix
 pub struct Matrix<T> {
@@ -149,6 +149,7 @@ impl<T: Default + Clone> Matrix<T> {
         }
     }
 }
+
 impl<T: Default + Clone> Default for Matrix<T> {
     /// Create a default `Matrix` instance
     fn default() -> Self {
@@ -325,6 +326,29 @@ where
 }
 impl<T> Matrix<T>
 where
+    T: Default + Clone + From<f64>,
+{
+    /// Create an identity matrix of given size
+    pub fn identity(size: usize) -> Matrix<T> {
+        let data = (0..size * size)
+            .map(|i| {
+                if i % (size + 1) == 0 {
+                    T::from(1.0)
+                } else {
+                    T::default()
+                }
+            })
+            .collect();
+
+        Matrix {
+            data,
+            row_size: size,
+            col_size: size,
+        }
+    }
+}
+impl<T> Matrix<T>
+where
     T: Default + Clone + Mul<Output = T> + Add<Output = T> + Into<f64>,
 {
     /// Compute the frobenius norm of a `Matrix`
@@ -341,10 +365,113 @@ where
         sum_of_squares.sqrt()
     }
 }
+impl<T> Matrix<T>
+where
+    T: Copy
+        + PartialOrd
+        + Default
+        + From<f64>
+        + Into<f64>
+        + Sub<Output = T>
+        + Add<Output = T>
+        + Mul<Output = T>
+        + Div<Output = T>
+        + Abs,
+{
+    /// Compute the inverse of a `Matrix`
+    /// NOTE: Only computable for square (M x M) matrices.
+    /// NOTE: Only computable for a `Matrix` where r = M (full rank).
+    pub fn inverse(&self) -> Option<Matrix<T>> {
+        // Validity check that it's a square matrix
+        if self.row_size != self.col_size {
+            return None;
+        }
+
+        let n = self.row_size;
+        let epsilon = T::from(1e-10);
+
+        // Regular matrix
+        let mut a = self.data.clone();
+        // Inverted matrix
+        let mut b = Matrix::<T>::identity(n).data;
+
+        for i in 0..n {
+            let pivot = (i..n).fold(i, |acc, j| {
+                match a[j * n + i].abs() > a[acc * n + i].abs() {
+                    true => j,
+                    false => acc,
+                }
+            });
+
+            // Validity check that it's not a singular matrix
+            if a[pivot * n + i].abs() < epsilon {
+                return None;
+            }
+
+            if pivot != i {
+                (0..n).for_each(|k| {
+                    a.swap(i * n + k, pivot * n + k);
+                    b.swap(i * n + k, pivot * n + k);
+                });
+            }
+
+            let pivot_val = a[i * n + i];
+            (0..n).for_each(|k| {
+                a[i * n + k] = a[i * n + k] / pivot_val;
+                b[i * n + k] = b[i * n + k] / pivot_val;
+            });
+
+            (0..n).filter(|&j| j != i).for_each(|j| {
+                let factor = a[j * n + i];
+                (0..n).for_each(|k| {
+                    a[j * n + k] = a[j * n + k] - factor * a[i * n + k];
+                    b[j * n + k] = b[j * n + k] - factor * b[i * n + k];
+                })
+            })
+        }
+
+        Some(Matrix {
+            data: b,
+            row_size: n,
+            col_size: n,
+        })
+    }
+}
+
+pub trait Abs {
+    fn abs(self) -> Self;
+}
+impl Abs for f64 {
+    fn abs(self) -> Self {
+        self.abs()
+    }
+}
+impl Abs for i32 {
+    fn abs(self) -> Self {
+        self.abs()
+    }
+}
+impl Abs for i64 {
+    fn abs(self) -> Self {
+        self.abs()
+    }
+}
+impl Abs for f32 {
+    fn abs(self) -> Self {
+        self.abs()
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Check if 2 float value's are *ABOUT* equal
+    fn approx_equal(a: &[f64], b: &[f64], epsilon: f64) -> bool {
+        a.iter()
+            .zip(b.iter())
+            .all(|(&a, &b)| (a - b).abs() < epsilon)
+    }
 
     #[test]
     fn test_matrix_vector_multiplication() {
@@ -590,5 +717,68 @@ mod tests {
         let expected: f64 = 5.477225575051661;
         let result = matrix.frobenius_norm();
         assert!((result - expected).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_inverse_2x2() {
+        let matrix = Matrix {
+            data: vec![4.0, 7.0, 2.0, 6.0],
+            row_size: 2,
+            col_size: 2,
+        };
+
+        let expected_inverse = vec![0.6, -0.7, -0.2, 0.4];
+        let result = matrix.inverse().unwrap();
+
+        assert!(approx_equal(&result.data, &expected_inverse, 1e-6));
+    }
+
+    #[test]
+    fn test_inverse_3x3() {
+        let matrix = Matrix {
+            data: vec![1.0, 2.0, 3.0, 0.0, 1.0, 4.0, 5.0, 6.0, 0.0],
+            row_size: 3,
+            col_size: 3,
+        };
+
+        let expected_inverse = vec![-24.0, 18.0, 5.0, 20.0, -15.0, -4.0, -5.0, 4.0, 1.0];
+        let result = matrix.inverse().unwrap();
+
+        assert!(approx_equal(&result.data, &expected_inverse, 1e-6));
+    }
+
+    #[test]
+    fn test_inverse_identity() {
+        let matrix = Matrix::<f64>::identity(3);
+        let result = matrix.inverse().unwrap();
+
+        assert_eq!(result.data, matrix.data);
+    }
+
+    #[test]
+    fn test_inverse_singular() {
+        let matrix = Matrix {
+            data: vec![1.0, 2.0, 2.0, 4.0],
+            row_size: 2,
+            col_size: 2,
+        };
+
+        let result = matrix.inverse();
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_inverse_1x1() {
+        let matrix = Matrix {
+            data: vec![2.0],
+            row_size: 1,
+            col_size: 1,
+        };
+
+        let expected_inverse = vec![0.5];
+        let result = matrix.inverse().unwrap();
+
+        assert!(approx_equal(&result.data, &expected_inverse, 1e-6));
     }
 }
