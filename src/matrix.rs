@@ -1,3 +1,4 @@
+use crate::random;
 use std::fmt::Debug;
 use std::ops::{Add, Div, Mul, Sub};
 
@@ -12,6 +13,19 @@ impl<T: Default + Clone> Matrix<T> {
     pub fn new(row_size: usize, col_size: usize) -> Self {
         Matrix {
             data: vec![T::default(); row_size * col_size],
+            row_size,
+            col_size,
+        }
+    }
+
+    /// Construct a new *non-empty* and *sized* `Matrix` with random values of `T`
+    pub fn new_random(row_size: usize, col_size: usize) -> Self
+    where
+        T: random::Random,
+    {
+        let random_data: Vec<T> = random::gen_rand_vec(row_size * col_size);
+        Matrix {
+            data: random_data,
             row_size,
             col_size,
         }
@@ -780,5 +794,27 @@ mod tests {
         let result = matrix.inverse().unwrap();
 
         assert!(approx_equal(&result.data, &expected_inverse, 1e-6));
+    }
+
+    #[test]
+    /// Test that a one by one matrix only has one value
+    fn test_random_1x1() {
+        let result: Matrix<f64> = Matrix::new_random(1, 1);
+        assert_eq!(result.data.len(), 1);
+    }
+
+    #[test]
+    /// Test that a two by three matrix has six values
+    fn test_random_2x3() {
+        let result: Matrix<i64> = Matrix::new_random(2, 3);
+        assert_eq!(result.data.len(), 6);
+    }
+
+    #[test]
+    /// Test that a twenty by twenty matrix has four hundred values
+    fn test_random_20x20() {
+        let result: Matrix<i64> = Matrix::new_random(20, 20);
+        println!("{:?}", result.data);
+        assert_eq!(result.data.len(), 400);
     }
 }
